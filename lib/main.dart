@@ -1,121 +1,162 @@
+import 'dart:convert'; // Necesario para transformar el texto de la API a JSON
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http; // Importamos la librería de internet
 
 void main() {
-  runApp(const MyApp());
+  runApp(const MiAppFutbol());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+// El contenedor principal de nuestra aplicación
+class MiAppFutbol extends StatelessWidget {
+  const MiAppFutbol({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
+      title: 'Mi App de Fútbol',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        primarySwatch: Colors.green, // Color verde futbolero para el botón/barra
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const PantallaPartidos(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+// Esta pantalla tiene estado (Stateful) porque va a cargar datos de internet
+class PantallaPartidos extends StatefulWidget {
+  const PantallaPartidos({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<PantallaPartidos> createState() => _PantallaPartidosState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _PantallaPartidosState extends State<PantallaPartidos> {
+  final String miToken = '2a5414f4e96e4b318dc83432d113e4eb';
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  // Esta función va a internet, busca los partidos y los devuelve en una Lista
+  Future<List<dynamic>> consultarPartidos() async {
+    final url = Uri.parse('https://api.football-data.org/v4/competitions/PL/matches?limit=10');
+
+    // Hacemos la petición GET incluyendo el Token que te pide la documentación
+    final respuesta = await http.get(
+      url,
+      headers: {'X-Auth-Token': miToken},
+    );
+
+    // Si la respuesta es correcta (Código 200 Ok)
+    if (respuesta.statusCode == 200) {
+      final datosDecodificados = jsonDecode(respuesta.body);
+      return datosDecodificados['matches']; // Devolvemos solo la lista de partidos
+    } else {
+      // Si falla (por ejemplo, si el token está mal)
+      throw Exception('Error al conectar con la API: ${respuesta.statusCode}');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('Partidos de la Premier League'),
+        backgroundColor: Colors.green,
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('Has toqueteado este botón estas veces:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+      // El FutureBuilder se encarga de escuchar a "consultarPartidos" y redibujar la pantalla solo
+      body: FutureBuilder<List<dynamic>>(
+        future: consultarPartidos(),
+        builder: (context, snapshot) {
+          // 1. Mientras está cargando, muestra el círculo de carga
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
+          // 2. Si hubo un error (falta de internet, token inválido...), muestra el error
+          else if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text('Ocurrió un problema: ${snapshot.error}'),
+              ),
+            );
+          }
+          
+          // 3. Si no trae datos o la lista está vacía
+          else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(
+              child: Text('No se encontraron partidos.'),
+            );
+          }
+
+          // 4. Si todo salió bien, guardamos los partidos en una variable
+          final listaDePartidos = snapshot.data!;
+
+          // Dibujamos la lista en la pantalla usando widgets super básicos
+          return ListView.builder(
+            itemCount: listaDePartidos.length,
+            itemBuilder: (context, index) {
+              final partido = listaDePartidos[index];
+
+              // Extraemos los datos que nos interesan del mapa JSON
+              final String equipoLocal = partido['homeTeam']['name'];
+              final String equipoVisitante = partido['awayTeam']['name'];
+              final String estado = partido['status'];
+              
+              // Los goles pueden venir vacíos (null) si el partido no ha empezado
+              final golesLocal = partido['score']['fullTime']['home'] ?? '-';
+              final golesVisitante = partido['score']['fullTime']['away'] ?? '-';
+
+              // Retornamos una tarjeta visual para cada partido
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                elevation: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0), // <-- Corregido: Ahora solo hay un padding instalado aquí
+                  child: Column(
+                    children: [
+                      // Fila para mostrar: Local vs Visitante
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Nombre Equipo Local
+                          Expanded(
+                            child: Text(
+                              equipoLocal,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          // Marcador
+                          Text(
+                            ' $golesLocal - $golesVisitante ',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                          ),
+                          // Nombre Equipo Visitante
+                          Expanded(
+                            child: Text(
+                              equipoVisitante,
+                              textAlign: TextAlign.end,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8), // Un pequeño espacio
+                      // Texto inferior con el estado del partido
+                      Text(
+                        'Estado: $estado',
+                        style: TextStyle(
+                          fontSize: 12, 
+                          color: estado == 'LIVE' ? Colors.red : Colors.grey
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
